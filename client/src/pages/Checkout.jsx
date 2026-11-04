@@ -3,15 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import { defaultServices } from '../data/services';
 import { 
   ArrowLeft, 
-  Check, 
   Loader2, 
-  QrCode, 
   AlertCircle, 
-  CheckCircle2, 
-  Copy, 
-  Smartphone, 
-  ShieldCheck, 
-  ExternalLink 
+  CheckCircle2,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 import api from '../api/client';
 
@@ -31,9 +27,8 @@ export default function Checkout() {
   });
 
   const [submitting, setSubmitting] = useState(false);
-  const [paymentResult, setPaymentResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [paymentResult, setPaymentResult] = useState(null);
 
   useEffect(() => {
     // Find service and plan
@@ -54,13 +49,6 @@ export default function Checkout() {
         setLoading(false);
       });
   }, [serviceId, decodedPlanName]);
-
-  const handleCopyVpa = (vpa) => {
-    if (!vpa) return;
-    navigator.clipboard.writeText(vpa);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
 
   const submitAirpayHostedForm = (hostedPayload) => {
     if (!hostedPayload?.actionUrl || !hostedPayload?.fields) return;
@@ -91,7 +79,7 @@ export default function Checkout() {
       setSubmitting(true);
       const cleanPrice = plan.price.replace(/[^\d]/g, '');
 
-      // Call our Express MERN backend
+      // Create order via Airpay API integration
       const res = await api.post('/api/orders/create', {
         name: formData.name,
         email: formData.email,
@@ -105,22 +93,20 @@ export default function Checkout() {
       if (res.data?.success) {
         setPaymentResult({
           order: res.data.data,
-          qrString: res.data.qrString,
           paymentUrl: res.data.paymentUrl,
           hostedPayload: res.data.hostedPayload,
           airpay: res.data.airpay
         });
 
-        // 1. If Airpay gateway provided an external redirect URL, automatically redirect
+        // Immediately auto-submit official Airpay Hosted Payment Gateway (UPI Intent, Cards, NetBanking)
+        if (res.data.hostedPayload) {
+          submitAirpayHostedForm(res.data.hostedPayload);
+          return;
+        }
+
+        // Direct payment redirect if URL returned
         if (res.data.paymentUrl && res.data.paymentUrl.startsWith('http')) {
           window.location.href = res.data.paymentUrl;
-        } 
-        // 2. On mobile devices, automatically invoke the UPI Intent if returned by Airpay
-        else if (res.data.qrString && res.data.qrString.startsWith('upi://')) {
-          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-          if (isMobile) {
-            window.location.href = res.data.qrString;
-          }
         }
       } else {
         throw new Error(res.data?.message || 'Payment initiation failed');
@@ -161,33 +147,32 @@ export default function Checkout() {
       <div className="container max-w-4xl">
         <Link
           to={`/service/${service.id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary mb-6 transition-colors"
+          className="inline-flex items-center gap-1 text-sm mb-6 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" /> Back to {service.title}
         </Link>
 
-        {paymentResult ? (
-          <div className="rounded-2xl border border-border bg-card p-6 md:p-8 shadow-lg max-w-lg mx-auto animate-fade-in">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600 mb-3">
+        {paymentResult && !submitting ? (
+          <div className="rounded-lg border bg-card text-card-foreground p-6 md:p-8 shadow-sm max-w-lg mx-auto">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600 mb-4">
               <CheckCircle2 className="h-8 w-8" />
             </div>
             
-            <h2 className="text-2xl font-bold text-foreground text-center">Order Created</h2>
+            <h2 className="text-2xl font-bold text-foreground text-center">Order Initiated</h2>
             <p className="mt-1 text-xs text-muted-foreground text-center">
               Airpay Order ID: <span className="font-mono font-semibold text-foreground">{paymentResult.order.orderId}</span>
             </p>
 
-            {/* Order Details */}
-            <div className="my-5 p-4 rounded-xl bg-secondary/40 border border-border text-left space-y-1.5 text-xs md:text-sm">
+            <div className="my-6 p-4 rounded-lg bg-muted/40 border text-left space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Service:</span>
-                <span className="font-semibold text-foreground">{service.title}</span>
+                <span className="font-medium text-foreground">{service.title}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Plan:</span>
-                <span className="font-medium text-foreground">{plan.name}</span>
+                <span className="font-medium text-foreground">{plan.name} Plan</span>
               </div>
-              <div className="flex justify-between border-t border-border pt-2 text-sm md:text-base font-bold">
+              <div className="flex justify-between border-t border-border pt-2 font-bold">
                 <span className="text-foreground">Total Payable:</span>
                 <span className="text-primary">
                   {paymentResult.order?.amount ? `₹${paymentResult.order.amount}` : plan.price}
@@ -195,74 +180,27 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Airpay Gateway Section */}
             {paymentResult.hostedPayload && (
-              <div className="my-5 rounded-xl border border-primary/20 bg-primary/5 p-5 text-center space-y-3">
-                <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wide">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
-                  <span>Airpay Official Payment Gateway</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Merchant ID: <span className="font-mono font-semibold text-foreground">{paymentResult.hostedPayload.fields.merchant_id}</span>
-                </p>
+              <div className="space-y-3">
                 <button
                   type="button"
                   onClick={() => submitAirpayHostedForm(paymentResult.hostedPayload)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md active:scale-[0.98]"
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2.5 px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
                 >
-                  <ExternalLink className="h-4 w-4" /> Pay with Airpay (UPI, Cards, NetBanking)
+                  <ExternalLink className="h-4 w-4" /> Open Airpay Payment Gateway
                 </button>
-                <p className="text-[11px] text-muted-foreground">
-                  Direct encrypted connection to Airpay gateway.
-                </p>
-              </div>
-            )}
-
-            {/* Airpay Dynamic QR Code (if returned by Airpay Seamless) */}
-            {paymentResult.qrString && (
-              <div className="my-5 rounded-xl border border-border/80 bg-background/80 p-5 text-center">
-                <div className="inline-block p-3 bg-white rounded-xl shadow-inner border border-border">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(paymentResult.qrString)}`}
-                    alt="Airpay QR Code"
-                    className="w-48 h-48 md:w-52 md:h-52 object-contain mx-auto"
-                  />
-                </div>
-                <p className="mt-3 text-xs font-medium text-muted-foreground">
-                  Scan Airpay dynamic QR with Google Pay, PhonePe, Paytm, or BHIM
-                </p>
-                <div className="mt-3">
-                  <a
-                    href={paymentResult.qrString}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
-                  >
-                    <Smartphone className="h-3.5 w-3.5" /> Open UPI App Intent
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* Airpay Notice if Seamless returned status */}
-            {paymentResult.airpay?.data?.message && (
-              <div className="my-4 rounded-lg border border-border bg-secondary/30 p-3 text-left text-xs space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold text-muted-foreground">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span>Airpay Gateway Status:</span>
-                </div>
-                <p className="text-muted-foreground font-mono text-[11px]">
-                  {paymentResult.airpay.data.message}
+                <p className="text-xs text-muted-foreground text-center">
+                  Official Airpay Payment Gateway (UPI Intent, NetBanking & Cards)
                 </p>
               </div>
             )}
 
             <div className="mt-6 border-t border-border pt-4 flex items-center justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <ShieldCheck className="h-4 w-4 text-green-600" /> 256-bit Secure Checkout
+                <ShieldCheck className="h-4 w-4 text-green-600" /> 256-bit Secure Gateway
               </span>
-              <Link to="/">
-                <button className="text-primary font-medium hover:underline">
-                  Return to Home
-                </button>
+              <Link to="/" className="text-primary font-medium hover:underline">
+                Return to Home
               </Link>
             </div>
           </div>
@@ -270,97 +208,99 @@ export default function Checkout() {
           <div className="grid gap-8 md:grid-cols-5">
             {/* Form Section */}
             <div className="md:col-span-3">
-              <h1 className="text-2xl font-bold text-foreground mb-6">Checkout</h1>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                {errorMessage && (
-                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
+              <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+              <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+                <div className="p-6">
+                  {errorMessage && (
+                    <div className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
-                    />
-                  </div>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium leading-none block mb-2">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-sm font-medium leading-none block mb-2">
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Phone *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-sm font-medium leading-none block mb-2">
+                        Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
 
-                  <div className="pt-2">
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-accent transition-colors disabled:opacity-50 shadow-md active:scale-[0.99]"
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full disabled:opacity-50"
                     >
                       {submitting ? (
                         <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Processing...
                         </>
                       ) : (
                         'Proceed to Payment'
                       )}
                     </button>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </div>
             </div>
 
-            {/* Plan Summary Section */}
+            {/* Order Summary Section */}
             <div className="md:col-span-2">
-              <h2 className="text-lg font-bold text-foreground mb-4">Order Summary</h2>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <div>
-                  <h3 className="font-display text-xl font-bold text-foreground">{service.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">{plan.name} Plan</p>
+              <h2 className="text-lg font-bold mb-4">Order Summary</h2>
+              <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+                <div className="flex flex-col space-y-1.5 p-6">
+                  <h3 className="text-2xl font-semibold leading-none tracking-tight">{service.title}</h3>
+                  <p className="text-sm text-muted-foreground">{plan.name} Plan</p>
                 </div>
 
-                <div className="my-4">
-                  <span className="text-2xl font-bold text-foreground">{plan.price}</span>
-                  <span className="text-sm text-muted-foreground">{plan.period}</span>
-                </div>
+                <div className="p-6 pt-0">
+                  <div className="mb-4">
+                    <span className="text-2xl font-bold">{plan.price}</span>
+                    <span className="text-sm text-muted-foreground">{plan.period}</span>
+                  </div>
 
-                <ul className="space-y-2">
-                  {plan.features?.map((f, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
+                  <ul className="space-y-2">
+                    {plan.features?.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
           </div>

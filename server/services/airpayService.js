@@ -196,9 +196,17 @@ async function initiateAirpayOrder({
     amount: numericAmount,
     currency: '356',
     isocurrency: 'INR',
-    channel: channel || process.env.AIRPAY_CHANNEL || 'pg',
-    bank_code: bankCode || process.env.AIRPAY_BANK_CODE || 'XYZ'
+    currency_code: '356',
+    iso_currency: 'INR',
+    chmod: process.env.AIRPAY_CHMOD || 'upi'
   };
+
+  if (channel && channel !== 'pg') {
+    data.channel = channel;
+  }
+  if (bankCode && bankCode !== 'XYZ') {
+    data.bank_code = bankCode;
+  }
 
   const encdata = encrypt(JSON.stringify(data), secretKey);
   const check = checksum(data);
@@ -307,9 +315,17 @@ async function prepareAirpayHostedPayload({
     amount: numericAmount,
     currency: '356',
     isocurrency: 'INR',
-    channel: channel || process.env.AIRPAY_CHANNEL || 'pg',
-    bank_code: bankCode || process.env.AIRPAY_BANK_CODE || 'XYZ'
+    currency_code: '356',
+    iso_currency: 'INR',
+    chmod: process.env.AIRPAY_CHMOD || 'upi'
   };
+
+  if (channel && channel !== 'pg') {
+    data.channel = channel;
+  }
+  if (bankCode && bankCode !== 'XYZ') {
+    data.bank_code = bankCode;
+  }
 
   const encdata = encrypt(JSON.stringify(data), secretKey);
   const check = checksum(data);
