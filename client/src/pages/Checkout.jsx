@@ -11,8 +11,7 @@ import {
   Copy, 
   Smartphone, 
   ShieldCheck, 
-  ExternalLink,
-  Zap 
+  ExternalLink 
 } from 'lucide-react';
 import api from '../api/client';
 
@@ -28,8 +27,7 @@ export default function Checkout() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '',
-    company: ''
+    phone: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -135,53 +133,6 @@ export default function Checkout() {
     }
   };
 
-  const handleOneRupeeTest = async () => {
-    setErrorMessage('');
-    const testName = formData.name.trim() || 'Test Customer';
-    const testEmail = formData.email.trim() || 'test@example.com';
-    const testPhone = formData.phone.trim() || '9876543210';
-
-    try {
-      setSubmitting(true);
-      const res = await api.post('/api/orders/create', {
-        name: testName,
-        email: testEmail,
-        phone: testPhone,
-        serviceId: service.id,
-        serviceTitle: `${service.title} (₹1 Test)`,
-        planName: `${plan.name} (Test Mode)`,
-        amount: '1'
-      });
-
-      if (res.data?.success) {
-        setPaymentResult({
-          order: res.data.data,
-          qrString: res.data.qrString,
-          paymentUrl: res.data.paymentUrl,
-          hostedPayload: res.data.hostedPayload,
-          airpay: res.data.airpay
-        });
-
-        // Auto-launch on mobile devices if Airpay returns UPI intent
-        if (res.data.paymentUrl && res.data.paymentUrl.startsWith('http')) {
-          window.location.href = res.data.paymentUrl;
-        } else if (res.data.qrString && res.data.qrString.startsWith('upi://')) {
-          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-          if (isMobile) {
-            window.location.href = res.data.qrString;
-          }
-        }
-      } else {
-        throw new Error(res.data?.message || 'Payment initiation failed');
-      }
-    } catch (err) {
-      console.error('Test payment error:', err);
-      setErrorMessage(err.response?.data?.message || err.message || 'Something went wrong during ₹1 test checkout.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="container py-24 text-center">
@@ -206,7 +157,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-12">
+    <div className="py-12">
       <div className="container max-w-4xl">
         <Link
           to={`/service/${service.id}`}
@@ -338,81 +289,51 @@ export default function Checkout() {
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Your full name"
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Email Address *
+                      Email *
                     </label>
                     <input
                       type="email"
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="you@example.com"
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Phone Number *
+                      Phone *
                     </label>
                     <input
                       type="tel"
                       required
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="+91 98765 43210"
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Company / Organization (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.company}
-                      onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                      placeholder="Your company name"
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-
-                  <div className="pt-2 space-y-3">
+                  <div className="pt-2">
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-md active:scale-[0.99]"
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-accent transition-colors disabled:opacity-50 shadow-md active:scale-[0.99]"
                     >
                       {submitting ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Initiating Payment...
+                          Processing...
                         </>
                       ) : (
-                        `Proceed to Pay ${plan.price}`
+                        'Proceed to Payment'
                       )}
                     </button>
-
-                    {/* ₹1 Test Payment Integration Button */}
-                    <button
-                      type="button"
-                      onClick={handleOneRupeeTest}
-                      disabled={submitting}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-emerald-500/80 bg-emerald-50/70 dark:bg-emerald-950/30 py-2.5 px-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/40 transition-all active:scale-[0.99] shadow-sm"
-                    >
-                      <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400 fill-emerald-500/20" />
-                      <span>⚡ Pay ₹1 (Test Payment Integration)</span>
-                    </button>
-                    <p className="text-[11px] text-center text-muted-foreground">
-                      Use the ₹1 button to safely test live UPI Intent & Airpay gateway checkout.
-                    </p>
                   </div>
                 </form>
               </div>
@@ -420,38 +341,26 @@ export default function Checkout() {
 
             {/* Plan Summary Section */}
             <div className="md:col-span-2">
-              <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-foreground mb-4">Order Summary</h2>
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <div>
-                  <h3 className="font-semibold text-foreground">{service.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{service.shortDescription}</p>
+                  <h3 className="font-display text-xl font-bold text-foreground">{service.title}</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">{plan.name} Plan</p>
                 </div>
 
-                <div className="border-t border-border pt-4">
-                  <div className="flex justify-between items-baseline mb-1">
-                    <span className="font-medium text-foreground">{plan.name} Plan</span>
-                    <span className="text-lg font-bold text-primary">{plan.price}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{plan.billing}</span>
+                <div className="my-4">
+                  <span className="text-2xl font-bold text-foreground">{plan.price}</span>
+                  <span className="text-sm text-muted-foreground">{plan.period}</span>
                 </div>
 
-                <div className="border-t border-border pt-4">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Included Features:
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {plan.features?.map((f, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground border border-border">
-                  <p>🔒 <strong>Secure Payment:</strong> Instant UPI Intent, QR Code & Net Banking with Airpay.</p>
-                </div>
+                <ul className="space-y-2">
+                  {plan.features?.map((f, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>

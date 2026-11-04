@@ -27,15 +27,14 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-display font-semibold text-foreground mb-3 text-sm uppercase tracking-wider">
+            <h4 className="font-display font-semibold text-foreground mb-3">
               Quick Links
             </h4>
             <div className="flex flex-col gap-2">
               {[
-                { label: "Home", to: "/" },
                 { label: "About Us", to: "/about" },
-                { label: "Services", to: "/#services" },
-                { label: "Contact", to: "/contact" }
+                { label: "Contact", to: "/contact" },
+                { label: "FAQs", to: "/#faqs" }
               ].map((link) => (
                 <Link
                   key={link.label}
@@ -50,7 +49,7 @@ export default function Footer() {
 
           {/* Legal Links */}
           <div>
-            <h4 className="font-display font-semibold text-foreground mb-3 text-sm uppercase tracking-wider">
+            <h4 className="font-display font-semibold text-foreground mb-3">
               Legal
             </h4>
             <div className="flex flex-col gap-2">
@@ -73,7 +72,7 @@ export default function Footer() {
 
           {/* Contact Details */}
           <div>
-            <h4 className="font-display font-semibold text-foreground mb-3 text-sm uppercase tracking-wider">
+            <h4 className="font-display font-semibold text-foreground mb-3">
               Contact
             </h4>
             <div className="flex flex-col gap-3">

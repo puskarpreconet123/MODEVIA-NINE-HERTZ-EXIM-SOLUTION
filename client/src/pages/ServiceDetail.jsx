@@ -57,7 +57,7 @@ export default function ServiceDetail() {
   const points = service.services?.[0]?.points || [];
 
   return (
-    <div className="min-h-screen">
+    <div>
       {/* Service Header */}
       <section className="bg-hero-gradient py-16 text-primary-foreground">
         <div className="container">

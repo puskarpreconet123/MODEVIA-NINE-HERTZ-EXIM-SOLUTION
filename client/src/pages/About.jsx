@@ -4,7 +4,7 @@ import { Phone, Mail, MapPin, CheckCircle } from 'lucide-react';
 
 export default function About() {
   return (
-    <div className="min-h-screen">
+    <div>
       <section className="bg-hero-gradient py-16 text-primary-foreground text-center">
         <div className="container">
           <h1 className="font-display text-3xl font-bold md:text-4xl">About Us</h1>

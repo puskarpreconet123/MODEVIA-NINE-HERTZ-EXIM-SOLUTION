@@ -3,7 +3,7 @@ import { companyInfo } from '../data/company';
 
 export default function Refund() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <section className="bg-hero-gradient py-16 text-center text-primary-foreground">
         <div className="container">
           <h1 className="font-display text-3xl font-bold md:text-4xl">Refund Policy</h1>
