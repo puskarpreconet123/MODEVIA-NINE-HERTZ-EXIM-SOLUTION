@@ -4,11 +4,11 @@
   "description": "Full MERN Stack application for MODEVIA NINE HERTZ EXIM SOLUTION",
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
-    "server:dev": "cd server && npm run dev",
-    "client:dev": "cd client && npm run dev",
-    "build": "cd client && npm run build",
-    "start": "cd server && npm start",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+    "server:dev": "npm --prefix server run dev",
+    "client:dev": "npm --prefix client run dev",
+    "build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
+    "start": "node server/server.js",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install"
   },
   "devDependencies": {
     "concurrently": "^9.2.5"

@@ -133,8 +133,8 @@ async function getAirpayAccessToken() {
     if (typeof encryptedResponse === 'string') {
       const decryptedStr = decrypt(encryptedResponse, secretKey);
       const tokenData = JSON.parse(decryptedStr);
-      cachedToken = tokenData.access_token || tokenData.token;
-      const expiresInSec = tokenData.expires_in || 3600;
+      cachedToken = tokenData.data?.access_token || tokenData.access_token || tokenData.token;
+      const expiresInSec = tokenData.data?.expires_in || tokenData.expires_in || 360;
       tokenExpiry = Date.now() + expiresInSec * 1000;
       return cachedToken;
     } else if (res.data?.access_token) {
@@ -187,15 +187,17 @@ async function initiateAirpayOrder({
     buyer_phone: String(customerPhone || '9999999999').replace(/[^\d]/g, '').slice(-10),
     buyer_firstname: firstName,
     buyer_lastname: lastName,
-    buyer_address: customerAddress || process.env.AIRPAY_DEFAULT_BUYER_ADDRESS || 'Holding No-516, RN Guha Road, Sagnik Plaza',
-    buyer_city: customerCity || process.env.AIRPAY_DEFAULT_BUYER_CITY || 'Kolkata',
-    buyer_state: customerState || process.env.AIRPAY_DEFAULT_BUYER_STATE || 'West Bengal',
+    buyer_address: customerAddress || process.env.AIRPAY_DEFAULT_BUYER_ADDRESS || '',
+    buyer_city: customerCity || process.env.AIRPAY_DEFAULT_BUYER_CITY || '',
+    buyer_state: customerState || process.env.AIRPAY_DEFAULT_BUYER_STATE || '',
     buyer_country: customerCountry || process.env.AIRPAY_DEFAULT_BUYER_COUNTRY || 'India',
-    buyer_pincode: customerPincode || process.env.AIRPAY_DEFAULT_BUYER_PINCODE || '700074',
+    buyer_pincode: customerPincode || process.env.AIRPAY_DEFAULT_BUYER_PINCODE || '',
     orderid: orderId,
     amount: numericAmount,
+    currency: '356',
+    isocurrency: 'INR',
     channel: channel || process.env.AIRPAY_CHANNEL || 'pg',
-    bank_code: bankCode || 'XYZ'
+    bank_code: bankCode || process.env.AIRPAY_BANK_CODE || 'XYZ'
   };
 
   const encdata = encrypt(JSON.stringify(data), secretKey);
@@ -224,7 +226,15 @@ async function initiateAirpayOrder({
     );
 
     let decryptedResponse = response.data;
-    if (response.data?.response && typeof response.data.response === 'string') {
+    if (typeof response.data === 'string' && response.data.includes('<RESPONSE>')) {
+      const msgMatch = response.data.match(/<MESSAGE><!\[CDATA\[(.*?)\]\]><\/MESSAGE>/i) || response.data.match(/<MESSAGE>(.*?)<\/MESSAGE>/i);
+      const statusMatch = response.data.match(/<TRANSACTIONSTATUS><!\[CDATA\[(.*?)\]\]><\/TRANSACTIONSTATUS>/i) || response.data.match(/<TRANSACTIONSTATUS>(.*?)<\/TRANSACTIONSTATUS>/i);
+      decryptedResponse = {
+        status: statusMatch?.[1] === '200' ? 'success' : 'fail',
+        message: msgMatch?.[1] || 'Airpay response received',
+        rawXml: response.data
+      };
+    } else if (response.data?.response && typeof response.data.response === 'string') {
       try {
         decryptedResponse = JSON.parse(decrypt(response.data.response, secretKey));
       } catch (e) {
@@ -259,6 +269,65 @@ async function initiateAirpayOrder({
   }
 }
 
+/**
+ * Prepare Airpay Hosted Payment Payload:
+ * Returns the exact form action and hidden fields to redirect the browser to Airpay's hosted checkout.
+ */
+async function prepareAirpayHostedPayload({
+  orderId,
+  amount,
+  customerName,
+  customerEmail,
+  customerPhone,
+  customerAddress,
+  customerCity,
+  customerState,
+  customerCountry,
+  customerPincode,
+  channel,
+  bankCode
+}) {
+  const merchantId = process.env.AIRPAY_MERCHANT_ID || '';
+  const secretKey = getEncryptionKey();
+  const hostedUrl = process.env.AIRPAY_HOSTED_URL || 'https://payments.airpay.co.in/pay/v4/';
+  const { firstName, lastName } = splitName(customerName);
+  const numericAmount = parseFloat(String(amount).replace(/[^\d.]/g, '') || '0').toFixed(2);
+
+  const data = {
+    buyer_email: customerEmail || 'customer@example.com',
+    buyer_phone: String(customerPhone || '9999999999').replace(/[^\d]/g, '').slice(-10),
+    buyer_firstname: firstName,
+    buyer_lastname: lastName,
+    buyer_address: customerAddress || process.env.AIRPAY_DEFAULT_BUYER_ADDRESS || '',
+    buyer_city: customerCity || process.env.AIRPAY_DEFAULT_BUYER_CITY || '',
+    buyer_state: customerState || process.env.AIRPAY_DEFAULT_BUYER_STATE || '',
+    buyer_country: customerCountry || process.env.AIRPAY_DEFAULT_BUYER_COUNTRY || 'India',
+    buyer_pincode: customerPincode || process.env.AIRPAY_DEFAULT_BUYER_PINCODE || '',
+    orderid: orderId,
+    amount: numericAmount,
+    currency: '356',
+    isocurrency: 'INR',
+    channel: channel || process.env.AIRPAY_CHANNEL || 'pg',
+    bank_code: bankCode || process.env.AIRPAY_BANK_CODE || 'XYZ'
+  };
+
+  const encdata = encrypt(JSON.stringify(data), secretKey);
+  const check = checksum(data);
+  const privatekey = getPrivateKey();
+  const token = await getAirpayAccessToken();
+
+  return {
+    actionUrl: token ? `${hostedUrl}?token=${encodeURIComponent(token)}` : hostedUrl,
+    token,
+    fields: {
+      merchant_id: merchantId,
+      encdata: encdata,
+      checksum: check,
+      privatekey: privatekey
+    }
+  };
+}
+
 module.exports = {
   checksum,
   encrypt,
@@ -266,5 +335,6 @@ module.exports = {
   getPrivateKey,
   getEncryptionKey,
   getAirpayAccessToken,
-  initiateAirpayOrder
+  initiateAirpayOrder,
+  prepareAirpayHostedPayload
 };

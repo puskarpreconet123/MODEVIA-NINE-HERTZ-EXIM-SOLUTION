@@ -84,7 +84,7 @@ export default function AdminLogin() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="User ID or admin@modevia.com"
+                placeholder="Enter your User ID or Email"
                 className="w-full rounded-lg border border-input bg-background pl-10 pr-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />

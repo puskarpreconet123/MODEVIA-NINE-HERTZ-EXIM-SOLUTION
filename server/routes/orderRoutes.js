@@ -4,7 +4,7 @@ const axios = require('axios');
 const Order = require('../models/Order');
 const { getDBStatus } = require('../config/db');
 const authMiddleware = require('../middleware/auth');
-const { initiateAirpayOrder, decrypt, getEncryptionKey } = require('../services/airpayService');
+const { initiateAirpayOrder, prepareAirpayHostedPayload, decrypt, getEncryptionKey } = require('../services/airpayService');
 
 // In-memory fallback orders store
 const memoryOrders = [];
@@ -39,9 +39,6 @@ router.post('/create', async (req, res) => {
     const clientId = `TEST_${Date.now()}`;
     const orderId = `ORD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-    const payeeVPA = process.env.PAYEE_VPA || 'modevia2025@nsdlpbma';
-    const payeeName = process.env.PAYEE_NAME || 'Modevia Nine Hertz';
-
     // 1. Initiate Airpay Seamless Payment Request
     const airpayResult = await initiateAirpayOrder({
       orderId,
@@ -54,18 +51,35 @@ router.post('/create', async (req, res) => {
       customerState: state,
       customerCountry: country,
       customerPincode: pincode,
-      bankCode: bankCode || 'XYZ',
+      bankCode: bankCode || process.env.AIRPAY_BANK_CODE || 'XYZ',
       channel: process.env.AIRPAY_CHANNEL || 'pg'
     });
 
-    // Default UPI QR deep link
-    let qrString = `upi://pay?pa=${payeeVPA}&pn=${encodeURIComponent(payeeName)}&am=${cleanAmount}&cu=INR&tn=Order_${orderId}`;
-    let paymentUrl = null;
+    // 2. Prepare Airpay Hosted Checkout Form payload
+    const hostedPayload = await prepareAirpayHostedPayload({
+      orderId,
+      amount: cleanAmount,
+      customerName: name,
+      customerEmail: email,
+      customerPhone: phone,
+      customerAddress: address,
+      customerCity: city,
+      customerState: state,
+      customerCountry: country,
+      customerPincode: pincode,
+      bankCode: bankCode || process.env.AIRPAY_BANK_CODE || 'XYZ',
+      channel: process.env.AIRPAY_CHANNEL || 'pg'
+    });
 
-    // Check if Airpay returned payment URL or redirect
+    let paymentUrl = null;
+    let qrString = null;
+
     if (airpayResult.success && airpayResult.data) {
       if (airpayResult.data.payment_url || airpayResult.data.redirect_url) {
         paymentUrl = airpayResult.data.payment_url || airpayResult.data.redirect_url;
+      }
+      if (airpayResult.data.qr_string || airpayResult.data.qrString || airpayResult.data.intent_url) {
+        qrString = airpayResult.data.qr_string || airpayResult.data.qrString || airpayResult.data.intent_url;
       }
     }
 
@@ -82,7 +96,7 @@ router.post('/create', async (req, res) => {
       currency: 'INR',
       status: 'pending',
       qrString,
-      payeeVPA,
+      paymentUrl,
       gatewayResponse: airpayResult,
       createdAt: new Date()
     };
@@ -92,10 +106,11 @@ router.post('/create', async (req, res) => {
         const saved = await Order.create(orderData);
         return res.status(201).json({
           success: true,
-          message: 'Order created successfully',
+          message: 'Order created with Airpay gateway',
           data: saved,
-          qrString,
           paymentUrl,
+          qrString,
+          hostedPayload,
           airpay: airpayResult
         });
       } catch (dbErr) {
@@ -106,10 +121,11 @@ router.post('/create', async (req, res) => {
     memoryOrders.unshift(orderData);
     return res.status(201).json({
       success: true,
-      message: 'Order created successfully (memory store)',
+      message: 'Order created with Airpay gateway (memory store)',
       data: orderData,
-      qrString,
       paymentUrl,
+      qrString,
+      hostedPayload,
       airpay: airpayResult
     });
   } catch (error) {

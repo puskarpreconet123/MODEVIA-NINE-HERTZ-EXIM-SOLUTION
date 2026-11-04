@@ -16,30 +16,37 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@modevia.com').toLowerCase().trim();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
-    const jwtSecret = process.env.JWT_SECRET || 'modevia_jwt_secret_key_2026_super_secure';
+    const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+    const adminPassword = process.env.ADMIN_PASSWORD || '';
+    const adminUserId = (process.env.ADMIN_USER_ID || '').toLowerCase().trim();
+    const adminUserPassword = process.env.ADMIN_USER_PASSWORD || '';
+    const jwtSecret = process.env.JWT_SECRET;
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
-    // Verify admin credentials
-    if (identifier !== adminEmail && identifier !== 'admin') {
+    if (!jwtSecret) {
+      return res.status(500).json({
+        success: false,
+        message: 'JWT secret is not configured in environment variables.'
+      });
+    }
+
+    // Match strictly against credentials defined in environment variables
+    const isEmailMatch = adminEmail && identifier === adminEmail && password === adminPassword;
+    const isUserIdMatch = adminUserId && (identifier === adminUserId || identifier === adminUserId.replace(/^m/i, '')) && password === adminUserPassword;
+
+    if (!isEmailMatch && !isUserIdMatch) {
       return res.status(401).json({
         success: false,
         message: 'Invalid username/email or password.'
       });
     }
 
-    if (password !== adminPassword) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid username/email or password.'
-      });
-    }
+    const userEmail = isEmailMatch ? adminEmail : (adminUserId || 'admin');
 
     // Generate JWT token
     const token = jwt.sign(
       {
-        email: adminEmail,
+        email: userEmail,
         role: 'admin'
       },
       jwtSecret,
@@ -51,7 +58,7 @@ router.post('/login', async (req, res) => {
       message: 'Login successful.',
       token,
       user: {
-        email: adminEmail,
+        email: userEmail,
         role: 'admin'
       }
     });
