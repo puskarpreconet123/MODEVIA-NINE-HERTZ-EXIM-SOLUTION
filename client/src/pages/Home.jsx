@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronDown, Check } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, ChevronDown, Check, CheckCircle2, XCircle, X, QrCode, Zap, Shield } from 'lucide-react';
 import { heroStats, faqs } from '../data/company';
 import { defaultServices, iconMap } from '../data/services';
 import api from '../api/client';
@@ -8,6 +8,35 @@ import api from '../api/client';
 export default function Home() {
   const [openFaq, setOpenFaq] = useState(null);
   const [services, setServices] = useState(defaultServices);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Payment Result Modal State
+  const [paymentModal, setPaymentModal] = useState({
+    show: false,
+    status: '',
+    orderId: ''
+  });
+
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    const orderId = searchParams.get('orderId');
+
+    if (payment) {
+      setPaymentModal({
+        show: true,
+        status: payment.toLowerCase(),
+        orderId: orderId || ''
+      });
+    }
+  }, [searchParams]);
+
+  const handleClosePaymentModal = () => {
+    setPaymentModal({ show: false, status: '', orderId: '' });
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('payment');
+    newParams.delete('orderId');
+    setSearchParams(newParams, { replace: true });
+  };
 
   useEffect(() => {
     // Attempt to fetch fresh services from Express API / MongoDB
@@ -52,6 +81,12 @@ export default function Home() {
                 <ArrowRight className="h-4 w-4" />
               </button>
             </Link>
+            <Link to="/manual-payment">
+              <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3.5 text-base font-semibold shadow-lg transition-all hover:scale-105 border border-emerald-400/30">
+                <QrCode className="h-4 w-4" />
+                Pay via UPI
+              </button>
+            </Link>
             <a href="#services">
               <button className="inline-flex items-center rounded-lg border border-primary-foreground/30 px-8 py-3.5 text-base font-semibold text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
                 Explore Services
@@ -71,6 +106,36 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Manual UPI Payment Banner */}
+      <section className="py-8 bg-secondary/50 border-b border-border">
+        <div className="container max-w-4xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-5 bg-card p-6 sm:p-7 rounded-2xl border border-border shadow-sm">
+            <div className="flex items-center gap-4 text-center sm:text-left flex-col sm:flex-row">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
+                <QrCode className="h-7 w-7" />
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-0.5 rounded-full mb-1">
+                  <Zap className="h-3 w-3 fill-current" /> Manual Direct Payment
+                </div>
+                <h3 className="font-display text-lg sm:text-xl font-bold text-foreground">
+                  Pay Directly via UPI
+                </h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                  Instant mobile transfer to <span className="font-mono font-semibold text-foreground">abhijithalde363996.aps@sbi</span> with GPay, PhonePe, Paytm, or BHIM.
+                </p>
+              </div>
+            </div>
+            <Link to="/manual-payment" className="shrink-0 w-full sm:w-auto">
+              <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 text-sm font-semibold shadow-md transition-all hover:scale-[1.02]">
+                <QrCode className="h-4 w-4" />
+                Pay via UPI Now
+              </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -190,6 +255,97 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Payment Confirmation Modal */}
+      {paymentModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 sm:p-8 text-center border border-slate-100 text-slate-800">
+            <button
+              onClick={handleClosePaymentModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {paymentModal.status === 'success' ? (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                  Payment Successful! 🎉
+                </h3>
+                <p className="text-slate-600 text-sm mb-5 leading-relaxed">
+                  Thank you for your business. Your payment has been received and confirmed by the payment gateway.
+                </p>
+
+                {paymentModal.orderId && (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 mb-6 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Order Reference:</span>
+                    <span className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                      {paymentModal.orderId}
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2.5">
+                  <button
+                    onClick={handleClosePaymentModal}
+                    className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md transition-all hover:scale-[1.01]"
+                  >
+                    Done & Return to Site
+                  </button>
+                  <Link
+                    to="/contact"
+                    onClick={handleClosePaymentModal}
+                    className="block w-full py-2 px-4 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition-colors"
+                  >
+                    Questions? Contact Our Team
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-inner">
+                  <XCircle className="w-9 h-9" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                  Payment Incomplete / Cancelled
+                </h3>
+                <p className="text-slate-600 text-sm mb-5 leading-relaxed">
+                  The transaction was not completed or was declined. If any amount was deducted from your account, it will automatically reverse within 3-5 working days.
+                </p>
+
+                {paymentModal.orderId && (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 mb-6 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Order Reference:</span>
+                    <span className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                      {paymentModal.orderId}
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2.5">
+                  <button
+                    onClick={handleClosePaymentModal}
+                    className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-md transition-all"
+                  >
+                    Dismiss
+                  </button>
+                  <Link
+                    to="/contact"
+                    onClick={handleClosePaymentModal}
+                    className="block w-full py-2 px-4 rounded-xl text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs font-medium transition-colors"
+                  >
+                    Contact Support for Assistance
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

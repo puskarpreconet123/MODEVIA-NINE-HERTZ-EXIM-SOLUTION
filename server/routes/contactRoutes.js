@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Contact = require('../models/Contact');
 const { getDBStatus } = require('../config/db');
+const { getMySQLStatus, saveContact, getAllContacts } = require('../config/mysql');
 const authMiddleware = require('../middleware/auth');
 
 const memoryContacts = [];
@@ -26,6 +27,19 @@ router.post('/', async (req, res) => {
       createdAt: new Date()
     };
 
+    if (getMySQLStatus()) {
+      try {
+        const saved = await saveContact(contactData);
+        return res.status(201).json({
+          success: true,
+          message: 'Message sent successfully! We will get back to you soon.',
+          data: saved
+        });
+      } catch (sqlErr) {
+        console.error('[Contact API] ❌ MySQL Contact Save Error:', sqlErr.message);
+      }
+    }
+
     if (getDBStatus()) {
       try {
         const saved = await Contact.create(contactData);
@@ -35,7 +49,7 @@ router.post('/', async (req, res) => {
           data: saved
         });
       } catch (dbErr) {
-        console.error('MongoDB Contact Save Error:', dbErr.message);
+        console.error('[Contact API] ❌ MongoDB Contact Save Error:', dbErr.message);
       }
     }
 
@@ -53,6 +67,10 @@ router.post('/', async (req, res) => {
 // GET all contact messages (Protected - Admin only)
 router.get('/', authMiddleware, async (req, res) => {
   try {
+    if (getMySQLStatus()) {
+      const contacts = await getAllContacts();
+      return res.json({ success: true, count: contacts.length, data: contacts });
+    }
     if (getDBStatus()) {
       const contacts = await Contact.find().sort({ createdAt: -1 });
       return res.json({ success: true, count: contacts.length, data: contacts });
